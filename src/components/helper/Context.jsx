@@ -215,7 +215,7 @@ const ContextProvider = ({ children }) => {
     <Context.Provider value={{
       isBrandBox, setIsBrandBox, isCategoryBox, setIsCategoryBox, brands, setBrands, purchaseItems, addToPurchase, removeFromPurchase,
       isSupplierBox, setIsSupplierBox, fetchSupplier, suppliers, setSuppliers, setPurchaseItems,
-      isCustomerBox, setIsCustomerBox, customers, setCustomers,userData, setUserData,
+      isCustomerBox, setIsCustomerBox, customers, setCustomers,userData, setUserData,fetchBrand, fetchCustomer, fetchSupplier,
       categories, fetchCategory, cart, setCart, fetchCart, addToCart, clearCart, removeFromCart, decreaseQuantity, clearPurchase
     }}>
       {children}
