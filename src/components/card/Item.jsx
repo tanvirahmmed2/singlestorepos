@@ -10,8 +10,11 @@ const Item = ({ product }) => {
   const { addToCart } = useContext(Context)
 
   return (
-    <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} transition={{ duration: 0.6 }} className='w-auto text-black text-center text-sm bg-white flex flex-col items-center justify-between group gap-1'>
-      <Image src={`${product?.image}`} alt='image' width={1000} height={1000} className='w-full h-50 object-cover' />
+    <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} transition={{ duration: 0.6 }} className='w-auto group text-black text-center text-sm bg-white flex flex-col items-center justify-between group gap-1'>
+      <Link href={`/products/${product?.slug}`} className='w-full overflow-hidden p-2  aspect-square'>
+        <Image src={`${product?.image}`} alt='image' width={1000} height={1000} className='w-full aspect-square rounded-xl object-cover' />
+      
+      </Link>
       <Link href={`/products/${product?.slug}`}>{product?.name}</Link>
       {
         product?.discount_price > 0 ? <div>
