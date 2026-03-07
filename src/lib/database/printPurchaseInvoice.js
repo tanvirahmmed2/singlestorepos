@@ -38,7 +38,7 @@ export const printPurchaseInvoice = (purchase) => {
         <body>
           <div class="header-container">
             <div class="company-brand">
-              <h1 style="margin:0;">NIZAM VARIETIES</h1>
+              <h1 style="margin:0;">NIZAM VARIETIES STORE</h1>
               <p style="margin:0;">Business License: TRAD/DSCC/012345/2024</p>
             </div>
             <div class="invoice-details">

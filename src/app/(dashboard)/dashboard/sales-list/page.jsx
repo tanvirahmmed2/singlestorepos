@@ -2,6 +2,7 @@
 import PrintOrder from '@/components/buttons/PrintOrder'
 import { generateReceipt } from '@/lib/database/print' // Updated to match your receipt function name
 import axios from 'axios'
+import Link from 'next/link'
 import React, { useEffect, useState, useCallback } from 'react'
 import { FaBarcode } from 'react-icons/fa'
 import { toast } from 'react-toastify'
@@ -81,7 +82,7 @@ const SalesListPage = () => {
             <div className=' w-full flex flex-col gap-1 col-span-5'>
               <p className='font-medium text-gray-700 mb-1'>Products ({order.items?.length || 0} items):</p>
               <ul className='w-full list-disc list-inside text-gray-800'>
-                {/* Changed product_list to items to match API payload */}
+                
                 {order.items && order.items.map((product, pIdx) => (
                   <li key={pIdx} className='w-full grid grid-cols-6'>
                     <p className='col-span-4'>{product.name}</p>
@@ -109,8 +110,9 @@ const SalesListPage = () => {
               {order.status !== 'returned' && (
                 <button onClick={() => returnOrder(order.order_id)} className='w-full bg-sky-600 text-white cursor-pointer'>Return</button>
               )}
-              {/* Using generateReceipt function imported at the top */}
+              
               <button onClick={() => generateReceipt(order)} className='w-full bg-sky-600 text-white cursor-pointer'>Print</button>
+              <Link href={`/dashboard/pos/${order.order_id}`} className='w-full bg-sky-600 text-white cursor-pointer text-center'>View</Link>
             </div>
           </div>
         ))}
