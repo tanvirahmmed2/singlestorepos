@@ -37,7 +37,7 @@ const Offers = () => {
   return (
     <div className="w-full p-4 min-h-screen">
       <div className="w-full flex flex-col items-center justify-center gap-4">
-        <h1 className='font-semibold text-center text-2xl mt-4'>Offer available on specific items</h1>
+        <h1 className='font-semibold text-center text-2xl mt-4'>Limited Time!</h1>
 
         {loading ? (
           <p>Loading offers...</p>
