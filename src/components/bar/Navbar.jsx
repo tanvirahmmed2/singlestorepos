@@ -50,17 +50,18 @@ const Navbar = () => {
         />
 
         <div className='w-auto hidden sm:flex flex-row items-center justify-center gap-2'>
-          <select
-            onChange={handleCategoryChange}
-            className='bg-transparent border border-white/40 rounded px-1 outline-none text-white cursor-pointer'
-          >
-            <option value="" className="text-black">Categories</option>
-            {categories.length > 0 && categories.map((cat) => (
-              <option value={cat.category_id} key={cat.category_id} className="text-black">
+          
+
+          {/* <div className='w-auto relative'>
+            <p className='px-2 h-14 w-auto flex items-center justify-center hover:bg-white/20' >Categories</p>
+            <div className='w-auto flex flex-col absolute top-4'>
+              {categories.length > 0 && categories.map((cat) => (
+              <Link href={`/products/category/${cat.category_id}`} key={cat.category_id} className="text-black">
                 {cat?.name}
-              </option>
+              </Link>
             ))}
-          </select>
+            </div>
+          </div> */}
 
           <Link className='px-2 h-14 w-auto flex items-center justify-center hover:bg-white/20' href={'/offers'}>Offers</Link>
           <Link className='px-2 h-14 w-auto flex items-center justify-center hover:bg-white/20' href={'/products'}>Products</Link>
