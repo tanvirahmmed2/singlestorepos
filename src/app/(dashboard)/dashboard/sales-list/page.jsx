@@ -5,6 +5,10 @@ import axios from 'axios'
 import Link from 'next/link'
 import React, { useEffect, useState, useCallback } from 'react'
 import { FaBarcode } from 'react-icons/fa'
+import { FaPrint } from 'react-icons/fa6'
+import { GiConfirmed, GiReturnArrow } from 'react-icons/gi'
+import {  LuView } from 'react-icons/lu'
+import { MdDelete } from 'react-icons/md'
 import { toast } from 'react-toastify'
 
 const SalesListPage = () => {
@@ -26,6 +30,8 @@ const SalesListPage = () => {
   }, [fetchOrder])
 
   const returnOrder = async (orderId) => {
+    const confirm= window.confirm('Are you sure about returning this?')
+    if(!confirm) return
     try {
       const res = await axios.put('/api/order', { orderId, action: 'return' })
       if (res.data.success) {
@@ -38,6 +44,8 @@ const SalesListPage = () => {
   }
 
   const deleteOrder = async (orderId) => {
+    const confirm= window.confirm('Are you sure about deleting this?')
+    if(!confirm) return
     try {
       const res = await axios.put('/api/order', { orderId, action: 'delete' })
       if (res.data.success) {
@@ -104,15 +112,15 @@ const SalesListPage = () => {
 
             <div className='w-full col-span-1 flex flex-col gap-1'>
               {order.status === 'pending' && (
-                <button onClick={() => confirmOrder(order.order_id)} className='w-full bg-green-600 text-white cursor-pointer'>Confirm</button>
+                <button onClick={() => confirmOrder(order.order_id)} className='w-full bg-green-600 text-white cursor-pointer text-center p-2'><GiConfirmed/></button>
               )}
-              <button onClick={() => deleteOrder(order.order_id)} className='w-full bg-red-500 text-white cursor-pointer'>Delete</button>
+              <button onClick={() => deleteOrder(order.order_id)} className='w-full bg-red-500 text-white cursor-pointer text-center p-2'><MdDelete/></button>
               {order.status !== 'returned' && (
-                <button onClick={() => returnOrder(order.order_id)} className='w-full bg-sky-600 text-white cursor-pointer'>Return</button>
+                <button onClick={() => returnOrder(order.order_id)} className='w-full bg-sky-600 text-white cursor-pointer text-center p-2'><GiReturnArrow/></button>
               )}
               
-              <button onClick={() => generateReceipt(order)} className='w-full bg-sky-600 text-white cursor-pointer'>Print</button>
-              <Link href={`/dashboard/pos/${order.order_id}`} className='w-full bg-sky-600 text-white cursor-pointer text-center'>View</Link>
+              <button onClick={() => generateReceipt(order)} className='w-full bg-sky-600 text-white cursor-pointer text-center p-2'><FaPrint/></button>
+              <Link href={`/dashboard/pos/${order.order_id}`} className='w-full bg-sky-600 text-white cursor-pointer text-center p-2'><LuView/></Link>
             </div>
           </div>
         ))}
