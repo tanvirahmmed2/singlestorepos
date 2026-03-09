@@ -46,7 +46,7 @@ const ForgetPasswordPage = () => {
                     <h1 className='text-2xl  uppercase '>
                         {view === 'request' ? 'Password Recovery' : 'Identity Verified'}
                     </h1>
-                    <p className='text-[10px] font-bold text-orange-400 uppercase tracking-widest mt-2'>
+                    <p className='text-[10px] font-bold text-black uppercase tracking-widest mt-2'>
                         {view === 'request' ? 'System Access Restoration' : 'Enter Received Credentials'}
                     </p>
                 </div>
@@ -54,7 +54,7 @@ const ForgetPasswordPage = () => {
                 {view === 'request' ? (
                     <form onSubmit={handleRequestOTP} className='flex flex-col gap-6'>
                         <div className='flex flex-col gap-2'>
-                            <label className='text-[10px]  text-orange-400 uppercase tracking-widest'>Email Registry</label>
+                            <label className='text-[10px]  text-black uppercase tracking-widest'>Email Registry</label>
                             <input 
                                 type="email"
                                 required
@@ -66,7 +66,7 @@ const ForgetPasswordPage = () => {
                         </div>
                         <button 
                             disabled={loading}
-                            className='w-full bg-orange-600 text-white py-4  uppercase tracking-[0.2em] text-xs hover:bg-orange-800 transition-all disabled:opacity-50'
+                            className='w-full bg-black text-white py-4  uppercase tracking-[0.2em] text-xs hover:bg-black transition-all disabled:opacity-50'
                         >
                             {loading ? 'Transmitting...' : 'Request OTP Code'}
                         </button>
@@ -74,7 +74,7 @@ const ForgetPasswordPage = () => {
                 ) : (
                     <form onSubmit={handleFinalReset} className='flex flex-col gap-6'>
                         <div className='flex flex-col gap-2'>
-                            <label className='text-[10px]  text-orange-400 uppercase tracking-widest'>One-Time Code</label>
+                            <label className='text-[10px]  text-black uppercase tracking-widest'>One-Time Code</label>
                             <input 
                                 type="text"
                                 maxLength="6"
@@ -85,7 +85,7 @@ const ForgetPasswordPage = () => {
                             />
                         </div>
                         <div className='flex flex-col gap-2'>
-                            <label className='text-[10px]  text-orange-400 uppercase tracking-widest'>New Secure Password</label>
+                            <label className='text-[10px]  text-black uppercase tracking-widest'>New Secure Password</label>
                             <input 
                                 type="password"
                                 required
@@ -96,14 +96,14 @@ const ForgetPasswordPage = () => {
                         </div>
                         <button 
                             disabled={loading}
-                            className='w-full bg-orange-600 text-white py-4  uppercase tracking-[0.2em] text-xs hover:bg-emerald-600 transition-all'
+                            className='w-full bg-black text-white py-4  uppercase tracking-[0.2em] text-xs hover:bg-emerald-600 transition-all'
                         >
                             {loading ? 'Updating...' : 'Set New Password'}
                         </button>
                         <button 
                             type="button"
                             onClick={() => setView('request')}
-                            className='text-[10px] font-bold text-orange-300 uppercase hover:text-orange-600 text-center'
+                            className='text-[10px] font-bold text-orange-300 uppercase hover:text-black text-center'
                         >
                             Resend Code
                         </button>

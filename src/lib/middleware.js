@@ -6,7 +6,7 @@ import { pool } from "./database/db";
 async function getAuthenticatedUser() {
     try {
         const cookieStore = await cookies(); 
-        const token = cookieStore.get('user_token')?.value;
+        const token = cookieStore.get('store_user_token')?.value;
 
         if (!token) return null;
 

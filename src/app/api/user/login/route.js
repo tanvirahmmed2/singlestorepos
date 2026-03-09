@@ -34,7 +34,7 @@ export async function POST(req) {
             payload: { name: user.name, email: user.email }
         }, { status: 200 });
 
-        response.cookies.set("nvs_user_token", token, {
+        response.cookies.set("user_token", token, {
             httpOnly: true, // Prevents JS access (XSS protection)
             path: "/",      // Essential: makes cookie available to all pages
             maxAge: TWENTY_YEARS, 
@@ -62,7 +62,7 @@ export async function GET() {
     });
 
 
-    res.cookies.set("nvs_user_token", "", {
+    res.cookies.set("user_token", "", {
         httpOnly: true,
         expires: new Date(0),
         path: "/",

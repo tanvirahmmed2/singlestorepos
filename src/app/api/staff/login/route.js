@@ -54,7 +54,7 @@ export async function POST(req) {
             { status: 200 }
         );
 
-        response.cookies.set("user_token", token, {
+        response.cookies.set("store_user_token", token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
             sameSite: "lax",
@@ -81,7 +81,7 @@ export async function GET() {
     });
 
 
-    res.cookies.set("user_token", "", {
+    res.cookies.set("store_user_token", "", {
         httpOnly: true,
         expires: new Date(0),
         path: "/",
