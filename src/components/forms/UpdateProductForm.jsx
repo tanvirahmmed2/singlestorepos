@@ -150,7 +150,7 @@ const UpdateProductForm = ({ product }) => {
 
                 <div className='w-full flex flex-col gap-1'>
                     <label htmlFor="description">Description *</label>
-                    <textarea name="description" id="description" required value={formData.description} onChange={handleChange} className='w-full border border-sky-400 px-4 p-1 rounded-sm outline-none min-h-[80px]'></textarea>
+                    <textarea name="description" id="description" required value={formData.description} onChange={handleChange} className='w-full border border-sky-400 px-4 p-1 rounded-sm outline-none min-h-20'></textarea>
                 </div>
 
                 <button
