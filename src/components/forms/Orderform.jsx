@@ -1,423 +1,299 @@
-import axios from 'axios'
+'use client'
 import React, { useContext, useEffect, useState } from 'react'
-import { toast } from 'react-toastify'
 import { Context } from '../helper/Context'
-import { MdDeleteOutline } from 'react-icons/md'
-import { generateReceipt } from '@/lib/database/print'
-import { FaMinus, FaPlus } from 'react-icons/fa6'
-import BarScanner from '../helper/BarcodeScanner'
-import { FaBarcode } from 'react-icons/fa'
+import { toast } from 'react-toastify'
+import axios from 'axios'
 import { useRouter } from 'next/navigation'
+import { 
+  FiShoppingBag, FiUser, FiTrash2, FiMinus, 
+  FiPlus, FiTag, FiCreditCard, FiLoader, FiZap 
+} from 'react-icons/fi'
 
-const Orderform = ({ cartItems = [] }) => {
-    const { decreaseQuantity, clearCart, addToCart, removeFromCart, setCart, customers, setIsCustomerBox } = useContext(Context)
-    const [saleType, setSaleType] = useState('retail')
-    const [products, setProducts] = useState([])
-    const [searchTerm, setSearchTerm] = useState('')
+const payment_method_options = ['cash', 'bkash', 'nagad', 'card']
 
-    // --- NEW STATES FOR MODAL ---
-    const [isPaymentModal, setIsPaymentModal] = useState(false)
-    const [receivedAmount, setReceivedAmount] = useState(0)
+const SalesForm = () => {
+  const { 
+    cart, addToCart, removeFromCart, clearCart, decreaseCartQuantity, staff 
+  } = useContext(Context)
+  const router = useRouter()
 
-    const [data, setData] = useState({
-        customer_id: '22',
-        extradiscount: 0,
-        subTotal: 0,
-        totalDiscount: 0,
-        totalPrice: 0,
-        transactionId: '',
-        paymentMethod: 'cash',
-        createdAt: new Date().toISOString().split('T')[0]
-    })
+  // --- States ---
+  const [saleType, setSaleType] = useState('retail') // retail or wholesale
+  const [isPaymentModal, setIsPaymentModal] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [receivedAmount, setReceivedAmount] = useState(0)
+  
+  const [formData, setFormData] = useState({
+    customer_phone: '',
+    manual_discount: 0,
+    payment_method: 'cash',
+    transaction_id: '',
+    notes: ''
+  })
 
-    // Search functionality
-    useEffect(() => {
-        const fetchData = async () => {
-            if (!searchTerm) {
-                setProducts([])
-                return
-            }
-            try {
-                const response = await axios.get(`/api/product/search?q=${searchTerm}`, { withCredentials: true })
-                setProducts(response.data.payload)
-            } catch (error) {
-                console.error(error)
-                setProducts([])
-            }
-        }
-        const delayDebounceFn = setTimeout(() => fetchData(), 300)
-        return () => clearTimeout(delayDebounceFn)
-    }, [searchTerm])
+  const cartItems = cart?.items || []
 
-    const handleBarcodeScan = async (code) => {
-        if (!code) return
-        try {
-            const response = await axios.get(`/api/product/search?q=${code}`, { withCredentials: true })
-            const foundItems = response.data.payload
+  // --- Calculations ---
+  
+  // 1. Subtotal: Based on the saleType (Retail Price or Wholesale Price)
+  const subTotal = cartItems.reduce((acc, item) => {
+    const price = saleType === 'retail' ? item.sale_price : item.wholesale_price
+    return acc + (Number(price) * item.quantity)
+  }, 0)
 
-            if (foundItems && foundItems.length === 1) {
-                const item = foundItems[0];
-                if (Number(item.stock) <= 0) {
-                    toast.error('Out of stock')
-                    return
-                }
-                const priceToSet = saleType === 'wholesale' ? item.wholesale_price : item.sale_price;
-                addToCart({ ...item, price: parseFloat(priceToSet) || 0 })
-                setSearchTerm('')
-            }
-        } catch (error) {
-            console.error("Scanner lookup error:", error)
-        }
-    }
+  // 2. Auto-Discount: Sum of product-level discounts (Retail only)
+  const autoDiscount = saleType === 'retail' 
+    ? cartItems.reduce((acc, item) => acc + (Number(item.discount_price || 0) * item.quantity), 0)
+    : 0
 
-    const handleSaleTypeChange = (type) => {
-        setSaleType(type)
-        setCart(prev => ({
-            ...prev,
-            items: prev.items.map(item => ({
-                ...item,
-                price: type === 'wholesale'
-                    ? (parseFloat(item.wholesale_price) || 0)
-                    : (parseFloat(item.sale_price) || 0)
-            }))
-        }))
-    }
+  // 3. Manual Discount & Grand Total
+  const manualDiscount = Number(formData.manual_discount) || 0
+  const grandTotal = Math.max(0, subTotal - autoDiscount - manualDiscount)
+  const changeAmount = Math.max(0, (Number(receivedAmount) || 0) - grandTotal)
 
-    const handlePriceChange = (productId, newPrice) => {
-        setCart(prev => ({
-            ...prev,
-            items: prev.items.map(item =>
-                item.product_id === productId
-                    ? { ...item, price: parseFloat(newPrice) || 0 }
-                    : item
-            )
-        }))
-    }
+  const handleInputChange = (e) => {
+    const { name, value } = e.target
+    setFormData(prev => ({ ...prev, [name]: value }))
+  }
 
-    // Master Calculation Effect
-    useEffect(() => {
-        const subTotal = cartItems.reduce((sum, item) => {
-            // Priority: Manual price > default sale/wholesale price
-            const itemPrice = item.price !== undefined ? item.price : (saleType === 'retail' ? item.sale_price : item.wholesale_price);
-            return sum + (parseFloat(itemPrice) * (item.quantity || 0));
-        }, 0)
+  const handleSaleTypeChange = (type) => {
+    setSaleType(type)
+    toast.info(`Switched to ${type.toUpperCase()} pricing`)
+  }
 
-        const productDiscountTotal = cartItems.reduce((sum, item) => {
-            const discountPerUnit = saleType === 'wholesale' ? 0 : (parseFloat(item.discount_price) || 0);
-            return sum + (discountPerUnit * (item.quantity || 0));
-        }, 0)
-
-        const manualDiscount = parseFloat(data.extradiscount) || 0
-        const totalPrice = subTotal - productDiscountTotal - manualDiscount
-
-        setData(prev => ({
-            ...prev,
-            subTotal,
-            totalDiscount: productDiscountTotal,
-            totalPrice: Math.max(0, totalPrice)
-        }))
-    }, [cartItems, data.extradiscount, saleType])
-
-    const handleChange = (e) => {
-        const { name, value } = e.target
-        setData(prev => ({ ...prev, [name]: value }))
-    }
-
-    const handleSubmit = (e) => {
-        e.preventDefault()
-        if (cartItems.length === 0) return toast.error("Cart is empty")
-        if (!data.customer_id) return toast.error("Please select a customer")
-
-        setReceivedAmount(data.totalPrice)
-        setIsPaymentModal(true)
-    }
-
+  const handleSubmitRequest = (e) => {
+    e.preventDefault()
+    if (cartItems.length === 0) return toast.error("Cart is empty")
+    if (!formData.customer_phone) return toast.error("Customer phone is required")
     
-    const changeAmount = (parseFloat(receivedAmount) || 0) - data.totalPrice
-    const router = useRouter()
+    setReceivedAmount(grandTotal) // Default received to grand total
+    setIsPaymentModal(true)
+  }
 
+  const finalizeSale = async () => {
+    setLoading(true)
+    try {
+      const payload = {
+        branch_id: staff?.branch_id,
+        staff_id: staff?.staff_id,
+        customer_phone: formData.customer_phone,
+        total_amount: subTotal,
+        discount_amount: autoDiscount + manualDiscount,
+        grand_total: grandTotal,
+        payment_method: formData.payment_method,
+        transaction_id: formData.transaction_id,
+        notes: formData.notes,
+        sale_type: saleType,
+        items: cartItems.map(item => ({
+          product_id: item.product_id,
+          quantity: item.quantity,
+          unit_price: saleType === 'retail' ? item.sale_price : item.wholesale_price
+        }))
+      }
 
-    const finalConfirm = async () => {
-        if (changeAmount < 0) {
-            toast.error("Received amount is less than total price");
-            return
-        }
-        const selectedCustomer = customers.find(c => String(c.customer_id) === String(data.customer_id))
-
-        const payload = {
-            customer_id: data.customer_id,
-            phone: selectedCustomer?.phone || '',
-            customerName: selectedCustomer?.name || '',
-            subtotal: data.subTotal,
-            discount: data.totalDiscount + (parseFloat(data.extradiscount) || 0),
-            total: data.totalPrice,
-            paid_amount: parseFloat(receivedAmount) || 0,
-            change_amount: Math.max(0, changeAmount),
-            paymentMethod: data.paymentMethod,
-            transactionId: data.transactionId,
-            saleType: saleType,
-            status: 'completed',
-            createdAt: data.createdAt,
-            items: cartItems.map(item => ({
-                product_id: item.product_id,
-                quantity: item.quantity,
-                // Ensure we send the current price from state
-                price: item.price !== undefined ? item.price : (saleType === 'retail' ? item.sale_price : item.wholesale_price)
-            }))
-        }
-
-        try {
-            const response = await axios.post('/api/order', payload, { withCredentials: true })
-            toast.success(response.data.message)
-            // if (generateReceipt) generateReceipt(response.data.payload)
-            // console.log(response.data.payload)
-
-
-            setIsPaymentModal(false)
-            clearCart()
-            setData({
-                customer_id: '22',
-                extradiscount: 0,
-                transactionId: '',
-                paymentMethod: 'cash',
-                subTotal: 0,
-                totalDiscount: 0,
-                totalPrice: 0,
-                createdAt: new Date().toISOString().split('T')[0]
-            })
-            setSaleType('retail')
-            router.push(`/dashboard/pos/${response.data.payload.order_id}`)
-        } catch (error) {
-            toast.error(error?.response?.data?.message || "Checkout failed")
-        }
+      const res = await axios.post('/api/sales', payload)
+      
+      if (res.status === 201) {
+        toast.success("Sale completed successfully!")
+        clearCart()
+        setIsPaymentModal(false)
+        setFormData({ customer_phone: '', manual_discount: 0, payment_method: 'cash', transaction_id: '', notes: '' })
+        // Optional: router.push(`/dashboard/invoice/${res.data.invoice_no}`)
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Transaction failed")
+    } finally {
+      setLoading(false)
     }
+  }
 
-    return (
-        <>
-            <form onSubmit={handleSubmit} className='w-full flex flex-col items-center justify-between gap-2 text-sm bg-white p-4 rounded-xl shadow-md border border-gray-100'>
-                <input
-                    type="date"
-                    name="createdAt"
-                    value={data.createdAt}
-                    onChange={handleChange}
-                    className='px-3 py-1 border border-black/10 rounded-lg outline-none w-full bg-white'
-                />
+  return (
+    <div className='w-full max-w-4xl mx-auto flex flex-col gap-6 p-6 bg-white shadow-xl rounded-4xl border border-slate-100'>
+      
+      {/* Header & Sale Type Toggle */}
+      <div className='flex flex-col md:flex-row justify-between items-center gap-4 border-b pb-6'>
+        <div className='flex items-center gap-3'>
+          <div className='p-3 bg-slate-900 text-white rounded-2xl shadow-lg'><FiShoppingBag size={24}/></div>
+          <div>
+            <h2 className='text-2xl font-black text-slate-800 tracking-tight'>SALES TERMINAL</h2>
+            <p className='text-[10px] font-bold text-slate-400 uppercase tracking-widest'>Branch: {staff?.branch_name || 'Main'}</p>
+          </div>
+        </div>
 
-                <div className='w-full flex flex-row items-center justify-center gap-1'>
-                    <select
-                        name="customer_id"
-                        id="customer_id"
-                        value={data.customer_id}
-                        onChange={handleChange}
-                        required
-                        className='px-3 w-full py-2 border border-black/10 rounded-lg outline-none bg-white'
-                    >
-                        <option value="">--select customer--</option>
-                        {customers.map((customer) => (
-                            <option value={customer.customer_id} key={customer.customer_id}>
-                                {customer.name}
-                            </option>
-                        ))}
-                    </select>
-                    <button type='button' onClick={() => setIsCustomerBox(true)} className='px-4 py-2 rounded-lg bg-sky-600 text-white font-bold'>+</button>
-                </div>
+        <div className='flex bg-slate-100 p-1.5 rounded-2xl w-full md:w-auto shadow-inner'>
+          <button 
+            onClick={() => handleSaleTypeChange('retail')}
+            className={`flex-1 md:w-32 py-2 rounded-xl text-xs font-black uppercase transition-all ${saleType === 'retail' ? 'bg-white text-slate-900 shadow-md' : 'text-slate-400'}`}
+          >
+            Retail
+          </button>
+          <button 
+            onClick={() => handleSaleTypeChange('wholesale')}
+            className={`flex-1 md:w-32 py-2 rounded-xl text-xs font-black uppercase transition-all ${saleType === 'wholesale' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400'}`}
+          >
+            Wholesale
+          </button>
+        </div>
+      </div>
 
-                <div className='grid grid-cols-2 gap-2 bg-gray-100  rounded-lg w-full'>
-                    <button type="button" onClick={() => handleSaleTypeChange('retail')}
-                        className={`py-2 rounded-md font-bold transition-all ${saleType === 'retail' ? 'bg-white text-sky-600 shadow-sm' : 'text-gray-500'}`}>Retail</button>
-                    <button type="button" onClick={() => handleSaleTypeChange('wholesale')}
-                        className={`py-2 rounded-md font-bold transition-all ${saleType === 'wholesale' ? 'bg-sky-600 text-white shadow-sm' : 'text-gray-500'}`}>Wholesale</button>
-                </div>
+      {/* Customer Info */}
+      <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+        <div className='flex flex-col gap-2'>
+          <label className='text-[10px] font-black text-slate-400 uppercase ml-2'>Customer Phone</label>
+          <div className='relative'>
+            <FiUser className='absolute left-4 top-1/2 -translate-y-1/2 text-slate-300' />
+            <input 
+              type="text" 
+              name="customer_phone"
+              placeholder="017XXXXXXXX"
+              value={formData.customer_phone}
+              onChange={handleInputChange}
+              className='w-full pl-11 pr-4 py-3.5 bg-slate-50 border-2 border-transparent focus:border-slate-900 rounded-2xl outline-none font-black text-lg transition-all'
+            />
+          </div>
+        </div>
+        <div className='flex flex-col justify-end'>
+          <div className='bg-blue-50 p-4 rounded-2xl border border-blue-100 flex items-center justify-between'>
+            <span className='text-[10px] font-black text-blue-400 uppercase'>Current Cart</span>
+            <span className='text-xl font-black text-blue-700'>{cartItems.length} Items</span>
+          </div>
+        </div>
+      </div>
 
-                <div className="w-full flex flex-col items-center gap-2 relative">
-                    <BarScanner onScan={handleBarcodeScan} />
-                    <div className="w-full px-2 flex flex-row border border-sky-400 items-center justify-between">
-                        <FaBarcode className='text-2xl text-sky-600' />
-                        <input
-                            type="text"
-                            name='searchTerm'
-                            id='searchTerm'
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            value={searchTerm}
-                            onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
-                            placeholder='search product name or barcode'
-                            className='w-full  px-4 p-1 rounded-sm  outline-none'
-                        />
+      {/* Cart Table */}
+      <div className='border-2 border-slate-50 rounded-4xl overflow-hidden shadow-sm'>
+        <table className='w-full text-left'>
+          <thead>
+            <tr className='bg-slate-50 text-[10px] font-black uppercase text-slate-400 tracking-widest border-b'>
+              <th className='p-5'>Item Name</th>
+              <th className='p-5 text-center'>Price</th>
+              <th className='p-5 text-center'>Quantity</th>
+              <th className='p-5 text-right'>Total</th>
+              <th className='p-5'></th>
+            </tr>
+          </thead>
+          <tbody className='divide-y divide-slate-50'>
+            {cartItems.map((item) => {
+              const currentPrice = saleType === 'retail' ? item.sale_price : item.wholesale_price
+              return (
+                <tr key={item.product_id} className='hover:bg-slate-50/50 font-bold text-sm'>
+                  <td className='p-5 text-slate-800'>{item.name}</td>
+                  <td className='p-5 text-center text-slate-500'>৳{currentPrice}</td>
+                  <td className='p-5'>
+                    <div className='flex items-center justify-center gap-3'>
+                      <button onClick={() => decreaseCartQuantity(item.product_id)} className='p-1.5 bg-slate-100 rounded-lg hover:bg-slate-200'><FiMinus/></button>
+                      <span className='w-8 text-center text-lg font-black'>{item.quantity}</span>
+                      <button onClick={() => addToCart(item)} className='p-1.5 bg-slate-100 rounded-lg hover:bg-slate-200'><FiPlus/></button>
                     </div>
+                  </td>
+                  <td className='p-5 text-right font-black text-slate-900'>৳{(currentPrice * item.quantity).toFixed(2)}</td>
+                  <td className='p-5 text-right'>
+                    <button onClick={() => removeFromCart(item.product_id)} className='text-slate-300 hover:text-red-500 transition-colors'>
+                      <FiTrash2 size={20}/>
+                    </button>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
 
-                    {searchTerm.length > 0 && products && products.length > 0 && (
-                        <div className="w-full flex flex-col gap-2 items-center justify-center absolute bg-white top-full border z-50 shadow-xl max-h-60 overflow-y-auto">
-                            {products.map((product) => (
-                                <div key={product.product_id} onClick={() => {
-                                    if (Number(product.stock) > 0) {
-                                        const price = saleType === 'wholesale' ? product.wholesale_price : product.sale_price;
-                                        addToCart({ ...product, price: parseFloat(price) });
-                                        setSearchTerm('')
-                                    } else {
-                                        toast.error('Out of stock')
-                                    }
-                                }} className="w-full cursor-pointer flex flex-row even:bg-gray-200 items-center justify-between p-2">
-                                    <p className="flex-1">{product.name}</p>
-                                    <p className="mx-2"> ৳ {saleType === 'retail' ? (product.sale_price - product.discount_price) : product.wholesale_price}</p>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
+      
 
-                <div className='w-full flex flex-col gap-2 max-h-48 overflow-y-auto border-y border-black/5 py-2'>
-                    <div className='w-full grid grid-cols-10 gap-2 font-bold text-gray-600 border-b pb-1'>
-                        <p className='col-span-4'>Product</p>
-                        <p className='col-span-2 text-center'>Quatityy</p>
-                        <p className='col-span-1'>Rate</p>
-                        <p className='col-span-1'>Disc</p>
-                        <p className='col-span-1'>Total</p>
-                        <p className='col-span-1 text-right'>Delete</p>
-                    </div>
-
-                    {cartItems.map(item => {
-                        const itemRate = item.price !== undefined ? item.price : (saleType === 'wholesale'
-                            ? (parseFloat(item.wholesale_price) || 0)
-                            : (parseFloat(item.sale_price) || 0));
-
-                        const itemDiscount = saleType === 'wholesale'
-                            ? 0
-                            : (parseFloat(item.discount_price) || 0);
-
-                        const rowTotal = (itemRate - itemDiscount) * (item.quantity || 0);
-
-                        return (
-                            <div key={item.product_id} className='w-full grid grid-cols-10 gap-2 p-2 mb-1 even:bg-gray-50 shadow-sm border border-black/10 rounded-lg items-center'>
-                                <div className='col-span-4'>
-                                    <p className='text-xs font-bold truncate' title={item.name}>{item.name}</p>
-                                    <p className='text-[10px] text-sky-600 font-bold uppercase'>{saleType}</p>
-                                </div>
-
-                                <div className='flex col-span-2 items-center justify-between bg-gray-100 px-2 py-1 rounded-full border border-black/5'>
-                                    <FaMinus className='cursor-pointer text-gray-600 hover:text-red-500 text-xs' onClick={() => decreaseQuantity(item?.product_id)} />
-                                    <span className='text-gray-800 font-bold'>{item?.quantity}</span>
-                                    <FaPlus className='cursor-pointer text-gray-600 hover:text-sky-600 text-xs' onClick={() => addToCart(item)} />
-                                </div>
-
-                                <div className='col-span-1 flex items-center'>
-                                    <input
-                                        type="number"
-                                        value={itemRate}
-                                        onChange={(e) => handlePriceChange(item.product_id, e.target.value)}
-                                        className='w-full bg-transparent border-b border-black/10 outline-none focus:border-sky-600'
-                                        step="0.01"
-                                    />
-                                </div>
-
-                                <p className='col-span-1 text-red-500 text-[10px]'>
-                                    {itemDiscount > 0 ? `-${itemDiscount}` : '0'}
-                                </p>
-
-                                <p className='col-span-1 font-bold text-gray-800 text-xs'>৳{rowTotal.toFixed(1)}</p>
-
-                                <div className='col-span-1 flex justify-end'>
-                                    <MdDeleteOutline
-                                        className='text-3xl text-red-400 cursor-pointer hover:text-red-600 transition-all'
-                                        onClick={() => removeFromCart(item?.product_id)}
-                                    />
-                                </div>
-                            </div>
-                        )
-                    })}
-                </div>
-
-                <div className='w-full flex flex-col gap-2 pt-2'>
-                    <div className='flex justify-between'>
-                        <span>Sub Total</span>
-                        <span>{data.subTotal.toFixed(2)}</span>
-                    </div>
-                    {data.totalDiscount > 0 && (
-                        <div className='flex justify-between text-red-500 font-medium'>
-                            <span>Auto Discount</span>
-                            <span>-{data.totalDiscount.toFixed(2)}</span>
-                        </div>
-                    )}
-                    <div className='flex justify-between items-center'>
-                        <label>Manual Discount</label>
-                        <input
-                            type="number"
-                            name="extradiscount"
-                            min={0}
-                            step="0.01"
-                            value={data.extradiscount}
-                            onChange={handleChange}
-                            className='w-20 border-b border-black/10 outline-none text-right focus:border-sky-600 transition-colors'
-                        />
-                    </div>
-                    <div className='flex justify-between font-extrabold text-xl border-t border-dashed pt-2 mt-2 text-sky-700'>
-                        <span>TOTAL</span>
-                        <span>৳{data.totalPrice.toFixed(2)}</span>
-                    </div>
-                </div>
-
-                <button className='w-full py-3 rounded-xl bg-sky-600 text-white hover:bg-sky-700 font-bold shadow-lg transition-all active:scale-95 uppercase' type='submit'>
-                    Complete {saleType} Sale
-                </button>
-            </form>
-
-            {isPaymentModal && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
-                        <div className="bg-sky-600 p-4 text-white text-center">
-                            <h2 className="text-lg font-bold uppercase">Confirm Payment</h2>
-                        </div>
-
-                        <div className="p-6 space-y-4">
-                            <div className="flex justify-between text-sm border-b pb-1">
-                                <span className="text-gray-500">Sub Total:</span>
-                                <span className="font-bold">৳{data.subTotal.toFixed(2)}</span>
-                            </div>
-                            <div className="flex justify-between text-sm border-b pb-1 text-red-500">
-                                <span>Total Discount:</span>
-                                <span className="font-bold">-৳{(data.totalDiscount + (parseFloat(data.extradiscount) || 0)).toFixed(2)}</span>
-                            </div>
-                            <div className="flex justify-between items-center py-2 bg-sky-50 px-3 rounded-lg">
-                                <span className="text-sky-800 font-bold">Total Payable</span>
-                                <span className="text-2xl font-black text-sky-700">৳{data.totalPrice.toFixed(2)}</span>
-                            </div>
-
-                            <div className="space-y-1">
-                                <label className="text-xs font-bold text-gray-600 uppercase">Paid Amount (Customer Gives)</label>
-                                <input
-                                    type="number"
-                                    autoFocus
-                                    onFocus={(e) => e.target.select()}
-                                    value={receivedAmount}
-                                    onChange={(e) => setReceivedAmount(e.target.value)}
-                                    className="w-full text-3xl font-bold p-3 border-2 border-sky-400 rounded-xl outline-none text-center bg-gray-50 focus:bg-white transition-all"
-                                />
-                            </div>
-
-                            <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg border border-red-100">
-                                <span className="text-red-700 font-bold">Change Amount</span>
-                                <span className="text-2xl font-black text-red-600">৳{changeAmount.toFixed(2)}</span>
-                            </div>
-                        </div>
-
-                        <div className="flex gap-2 p-4 bg-gray-50">
-                            <button
-                                onClick={() => setIsPaymentModal(false)}
-                                className="flex-1 py-3 font-bold text-gray-500 hover:bg-gray-200 rounded-xl transition-all"
-                            >
-                                Back
-                            </button>
-                            <button
-                                onClick={finalConfirm}
-                                className="flex-2 py-3 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl shadow-lg active:scale-95 transition-all uppercase"
-                            >
-                                Confirm & Complete
-                            </button>
-                        </div>
-                    </div>
-                </div>
+      {/* Summary Area */}
+      <div className='grid grid-cols-1 md:grid-cols-2 gap-6 items-start'>
+        <textarea 
+          name="notes" 
+          placeholder="Add sale notes..." 
+          onChange={handleInputChange} 
+          className='bg-slate-50 border-2 border-transparent focus:border-slate-100 p-5 rounded-4xl h-32 text-sm outline-none font-medium' 
+        />
+        <div className='flex flex-col gap-4'>
+          <div className='flex flex-col gap-2 px-2'>
+            <div className='flex justify-between font-bold text-slate-400'>
+              <span className='text-xs uppercase'>Subtotal</span>
+              <span>৳{subTotal.toFixed(2)}</span>
+            </div>
+            {autoDiscount > 0 && (
+              <div className='flex justify-between font-bold text-green-500'>
+                <span className='text-xs uppercase'>Item Discount</span>
+                <span>-৳{autoDiscount.toFixed(2)}</span>
+              </div>
             )}
-        </>
-    )
+            <div className='flex justify-between items-center bg-red-50 p-4 rounded-2xl border border-red-100'>
+              <span className='text-[10px] font-black text-red-400 uppercase flex items-center gap-1'><FiTag/> Manual Disc</span>
+              <input 
+                type="number" 
+                name="manual_discount" 
+                onChange={handleInputChange} 
+                className='w-24 text-right font-black text-red-600 bg-transparent outline-none' 
+                placeholder="0.00" 
+              />
+            </div>
+          </div>
+          <button 
+            onClick={handleSubmitRequest}
+            disabled={cartItems.length === 0}
+            className='w-full py-6 bg-slate-900 text-white font-black text-2xl rounded-4xl hover:bg-black shadow-xl shadow-slate-200 active:scale-[0.98] transition-all disabled:opacity-20'
+          >
+            CHECKOUT ৳{grandTotal.toLocaleString()}
+          </button>
+        </div>
+      </div>
+
+      {/* Final Payment Modal */}
+      {isPaymentModal && (
+        <div className='fixed inset-0 flex items-center justify-center z- p-4 animate-in fade-in duration-200'>
+          <div className='absolute inset-0 bg-slate-900/60 backdrop-blur-md' onClick={() => setIsPaymentModal(false)}></div>
+          <div className='relative bg-white p-10 rounded-[3rem] shadow-2xl w-full max-w-md flex flex-col gap-6'>
+            <div className='text-center'>
+                <h3 className='text-2xl font-black text-slate-900 uppercase tracking-tight'>Confirm Sale</h3>
+                <p className='text-xs font-bold text-slate-400 uppercase tracking-widest mt-1'>Review Payment Details</p>
+            </div>
+            
+            <div className='bg-slate-50 p-6 rounded-[2.5rem] text-center border-2 border-dashed border-slate-200'>
+                <p className='text-[10px] text-slate-400 font-black uppercase mb-1'>Net Payable</p>
+                <p className='text-5xl font-black text-slate-900 tracking-tighter'>৳{grandTotal.toLocaleString()}</p>
+            </div>
+            
+            <div className='grid grid-cols-2 gap-4'>
+                <div className='flex flex-col gap-2'>
+                    <label className='text-[10px] font-black text-slate-400 uppercase ml-2'>Method</label>
+                    <select name="payment_method" onChange={handleInputChange} value={formData.payment_method} className='w-full border-2 border-slate-100 p-4 rounded-2xl font-black bg-slate-50 outline-none focus:border-slate-900 transition-all'>
+                      {payment_method_options.map(m => <option key={m} value={m}>{m.toUpperCase()}</option>)}
+                    </select>
+                </div>
+                <div className='flex flex-col gap-2'>
+                    <label className='text-[10px] font-black text-slate-400 uppercase ml-2'>Received Cash</label>
+                    <input 
+                      type="number" 
+                      autoFocus
+                      onFocus={(e) => e.target.select()}
+                      value={receivedAmount}
+                      onChange={(e) => setReceivedAmount(e.target.value)} 
+                      className='w-full border-2 border-slate-100 p-4 rounded-2xl font-black bg-slate-50 outline-none focus:border-slate-900 transition-all text-center' 
+                    />
+                </div>
+            </div>
+
+            <div className='bg-green-50 p-4 rounded-2xl flex justify-between items-center border border-green-100'>
+                <span className='text-xs font-black text-green-600 uppercase'>Return Change</span>
+                <span className='text-2xl font-black text-green-700 uppercase font-mono'>৳{changeAmount.toFixed(2)}</span>
+            </div>
+
+            <button 
+              onClick={finalizeSale} 
+              disabled={loading}
+              className='w-full bg-slate-900 text-white py-6 rounded-4xl font-black text-xl shadow-xl hover:bg-black flex items-center justify-center gap-3 transition-all'
+            >
+              {loading ? <FiLoader className='animate-spin' /> : <><FiZap /> FINALIZE SALE</>}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
-export default Orderform;
+export default SalesForm
